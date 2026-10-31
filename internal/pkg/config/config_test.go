@@ -119,7 +119,7 @@ func TestNew(t *testing.T) {
 
 		assert.Equal(t, 7, reflect.TypeOf(Config{}).NumField())
 		assert.Equal(t, 2, reflect.TypeOf(Log{}).NumField())
-		assert.Equal(t, 11, reflect.TypeOf(Runner{}).NumField())
+		assert.Equal(t, 13, reflect.TypeOf(Runner{}).NumField())
 		assert.Equal(t, 8, reflect.TypeOf(Cache{}).NumField())
 		assert.Equal(t, 9, reflect.TypeOf(Container{}).NumField())
 		assert.Equal(t, 1, reflect.TypeOf(Host{}).NumField())
@@ -305,7 +305,7 @@ server:
 
 		assert.Equal(t, 7, reflect.TypeOf(Config{}).NumField())
 		assert.Equal(t, 2, reflect.TypeOf(Log{}).NumField())
-		assert.Equal(t, 11, reflect.TypeOf(Runner{}).NumField())
+		assert.Equal(t, 13, reflect.TypeOf(Runner{}).NumField())
 		assert.Equal(t, 8, reflect.TypeOf(Cache{}).NumField())
 		assert.Equal(t, 9, reflect.TypeOf(Container{}).NumField())
 		assert.Equal(t, 1, reflect.TypeOf(Host{}).NumField())
