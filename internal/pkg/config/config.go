@@ -535,13 +535,13 @@ func New(opts ...Option) (*Config, error) {
 	config := &Config{
 		Log: Log{Level: "info", JobLevel: "info"},
 		Runner: Runner{
-			File                : ".runner",
-			Capacity            : 1,
-			Timeout             : 3 * time.Hour,
-			FetchTimeout        : 30 * time.Second,
-			ReportInterval      : time.Second,
-			WorkdirCleanupAge   : 24 * time.Hour,
-			IdleCleanupInterval : 10 * time.Minute,
+			File:                ".runner",
+			Capacity:            1,
+			Timeout:             3 * time.Hour,
+			FetchTimeout:        30 * time.Second,
+			ReportInterval:      time.Second,
+			WorkdirCleanupAge:   24 * time.Hour,
+			IdleCleanupInterval: 10 * time.Minute,
 			ReportRetry: Retry{
 				MaxRetries:   10,
 				InitialDelay: 100 * time.Millisecond,
