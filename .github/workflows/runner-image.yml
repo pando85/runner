@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feat/workspace-gc
     tags:
       - 'v*'
   workflow_dispatch:
@@ -58,6 +59,7 @@ jobs:
           images: ghcr.io/pando85/runner
           tags: |
             type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=workspace-gc,enable=${{ github.ref == 'refs/heads/feat/workspace-gc' }}
             type=ref,event=tag
             type=sha,prefix=sha-,format=short
       - name: Authenticate to GHCR
