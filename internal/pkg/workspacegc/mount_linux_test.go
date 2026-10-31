@@ -14,7 +14,7 @@ func TestMountpointsUnderFromMountinfo(t *testing.T) {
 		"33 24 0:4 / /cache/bbbbbbbbbbbbbbbb/mount\\040name rw,relatime - tmpfs tmpfs rw\n"
 	for _, tt := range []struct {
 		name string
-		dir string
+		dir  string
 		want bool
 	}{
 		{"nested", "/cache/aaaaaaaaaaaaaaaa", true},
