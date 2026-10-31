@@ -542,12 +542,12 @@ func New(opts ...Option) (*Config, error) {
 			ReportInterval:      time.Second,
 			WorkdirCleanupAge:   24 * time.Hour,
 			IdleCleanupInterval: 10 * time.Minute,
-			ReportRetry:         Retry{
+			ReportRetry: Retry{
 				MaxRetries:   10,
 				InitialDelay: 100 * time.Millisecond,
 				MaxDelay:     0,
 			},
-			DefaultLabels:       []string{},
+			DefaultLabels: []string{},
 		},
 		Cache:     Cache{Enabled: true, Dir: filepath.Join(home, ".cache", "actcache")},
 		Container: Container{DockerHost: "-", WorkdirParent: "workspace", ValidVolumes: []string{}},
