@@ -53,7 +53,7 @@ func TestNew(t *testing.T) {
 
 		assert.Equal(t, 7, reflect.TypeOf(Config{}).NumField())
 		assert.Equal(t, 2, reflect.TypeOf(Log{}).NumField())
-		assert.Equal(t, 11, reflect.TypeOf(Runner{}).NumField())
+		assert.Equal(t, 13, reflect.TypeOf(Runner{}).NumField())
 		assert.Equal(t, 8, reflect.TypeOf(Cache{}).NumField())
 		assert.Equal(t, 9, reflect.TypeOf(Container{}).NumField())
 		assert.Equal(t, 1, reflect.TypeOf(Host{}).NumField())
@@ -71,6 +71,8 @@ func TestNew(t *testing.T) {
 		assert.False(t, config.Runner.Insecure)
 		assert.Equal(t, 30*time.Second, config.Runner.FetchTimeout)
 		assert.Equal(t, 1*time.Second, config.Runner.ReportInterval)
+		assert.Equal(t, 24*time.Hour, config.Runner.WorkdirCleanupAge)
+		assert.Equal(t, 10*time.Minute, config.Runner.IdleCleanupInterval)
 		assert.Empty(t, config.Runner.DefaultLabels)
 		assert.Equal(t, uint(10), config.Runner.ReportRetry.MaxRetries)
 		assert.Equal(t, 100*time.Millisecond, config.Runner.ReportRetry.InitialDelay)
