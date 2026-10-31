@@ -365,9 +365,8 @@ jobs:
           PIP_BREAK_SYSTEM_PACKAGES: 1
           PIP_PROGRESS_BAR: off
         run: |
-          apt-get update -qq
-          apt-get install -y -qq python3-pip
-          python3 -m pip install 'pre-commit>=3.2.0'
+          apt-get update -q
+          apt-get install -y -q pre-commit
 
       - name: validate .pre-commit-hooks.yaml
         run: pre-commit validate-manifest .pre-commit-hooks.yaml
