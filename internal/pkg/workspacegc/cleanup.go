@@ -76,6 +76,16 @@ func Cleanup(ctx context.Context, root string, maxAge time.Duration) (int, error
 		if !owned {
 			continue
 		}
+		// Removing a directory that contains a bind mount can delete files
+		// outside the scratch workspace. Always fail closed on mount errors.
+		mounted, err := mountpointsUnder(dir)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("inspect mounts in %q: %w", dir, err))
+			continue
+		}
+		if mounted {
+			continue
+		}
 		if err := os.RemoveAll(dir); err != nil {
 			errs = append(errs, fmt.Errorf("remove stale scratch directory %q: %w", dir, err))
 			continue
