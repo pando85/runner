@@ -8,6 +8,7 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	runnerv1 "code.forgejo.org/forgejo/actions-proto/runner/v1"
 	"connectrpc.com/connect"
@@ -17,6 +18,7 @@ import (
 	"code.forgejo.org/forgejo/runner/v13/internal/app/run"
 	"code.forgejo.org/forgejo/runner/v13/internal/pkg/client"
 	"code.forgejo.org/forgejo/runner/v13/internal/pkg/config"
+	"code.forgejo.org/forgejo/runner/v13/internal/pkg/workspacegc"
 	gouuid "github.com/google/uuid"
 )
 
@@ -94,11 +96,46 @@ func (p *poller) Poll() {
 		})
 	}
 
+	if p.cfg.Runner.WorkdirCleanupAge > 0 && p.cfg.Runner.IdleCleanupInterval > 0 {
+		wg.Go(func() {
+			p.runWorkspaceGC(&inProgressTasks)
+		})
+	}
+
 	wg.Wait()
 	log.Trace("[poller] shutdown complete, all tasks complete")
 
 	// signal the poller is finished
 	close(p.done)
+}
+
+// runWorkspaceGC periodically reclaims abandoned host scratch directories.
+// It does not block job polling: new jobs always create a fresh random directory,
+// so a newly started job cannot use a previously stale candidate.
+func (p *poller) runWorkspaceGC(inProgressTasks *atomic.Int64) {
+	ticker := time.NewTicker(p.cfg.Runner.IdleCleanupInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-p.pollingCtx.Done():
+			return
+		case <-ticker.C:
+			p.cleanupIdleWorkspaces(inProgressTasks)
+		}
+	}
+}
+
+func (p *poller) cleanupIdleWorkspaces(inProgressTasks *atomic.Int64) {
+	if inProgressTasks.Load() != 0 {
+		return
+	}
+	removed, err := workspacegc.Cleanup(p.pollingCtx, p.cfg.Host.WorkdirParent, p.cfg.Runner.WorkdirCleanupAge)
+	if err != nil {
+		log.WithError(err).Warn("[poller] failed to clean some stale host workspaces")
+	}
+	if removed > 0 {
+		log.Infof("[poller] removed %d stale host workspaces", removed)
+	}
 }
 
 func (p *poller) pollForClient(limiter *rate.Limiter, client client.Client, runner run.RunnerInterface, capacity int64, fetchMutex chan any, taskVersions, inProgressTasks *atomic.Int64, wg *sync.WaitGroup) {

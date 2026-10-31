@@ -40,6 +40,13 @@ runner:
   # canceled.
   # If unset or zero, the jobs will be canceled immediately.
   shutdown_timeout: 3h
+  # Remove abandoned host-execution scratch directories under host.workdir_parent
+  # when the daemon is idle. Directories are selected by the runner's scratch
+  # marker or the legacy act/hostexecutor/tmp layout; action caches are preserved.
+  # Set either duration to 0s to disable the janitor.
+  # Use a dedicated host.workdir_parent per runner daemon (not shared by daemons).
+  workdir_cleanup_age: 24h
+  idle_cleanup_interval: 10m
   # Whether skip verifying the TLS certificate of the instance.
   insecure: false
   # The timeout for fetching the job from the Forgejo instance.
