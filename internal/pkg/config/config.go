@@ -39,6 +39,8 @@ type Runner struct {
 	Insecure        bool              // Insecure indicates whether the runner operates in an insecure mode.
 	FetchTimeout    time.Duration     // FetchTimeout specifies the timeout duration for fetching resources.
 	ReportInterval  time.Duration     // ReportInterval specifies the interval duration for reporting status and logs of a running job.
+	WorkdirCleanupAge   time.Duration // WorkdirCleanupAge is the minimum age of abandoned host scratch directories; zero disables cleanup.
+	IdleCleanupInterval time.Duration // IdleCleanupInterval controls how often cleanup runs while the daemon is idle.
 	DefaultLabels   []string          // Default labels for a runner, if not configured at server connection.
 	ReportRetry     Retry             // At the end of a job, configures retrying sending logs to remote.
 }
@@ -208,6 +210,8 @@ type serializedRunnerSettings struct {
 	FetchTimeout    time.Duration                 `yaml:"fetch_timeout"`    // FetchTimeout specifies the timeout duration for fetching resources.
 	FetchInterval   time.Duration                 `yaml:"fetch_interval"`   // FetchInterval specifies the interval duration for fetching resources.  Operates as a default for all connections, if not provided by a specific connection.
 	ReportInterval  time.Duration                 `yaml:"report_interval"`  // ReportInterval specifies the interval duration for reporting status and logs of a running job.
+	WorkdirCleanupAge   *time.Duration `yaml:"workdir_cleanup_age"` // Maximum age of host scratch directories, zero disables.
+	IdleCleanupInterval *time.Duration `yaml:"idle_cleanup_interval"` // Frequency of idle workspace cleanup, zero disables.
 	Labels          labelList                     `yaml:"labels"`           // Labels specify the labels of the runner. Labels are declared on each startup.
 	ReportRetry     serializedReportRetrySettings `yaml:"report_retry"`     // ReportRetry defines whether sending logs to the remote should be retried after a job has completed.
 }
@@ -265,6 +269,20 @@ func (s *serializedRunnerSettings) applyTo(config *Config) error {
 			log.Warnf("Ignoring invalid `runner.report_interval`: %q", s.ReportInterval)
 		} else {
 			config.Runner.ReportInterval = s.ReportInterval
+		}
+	}
+	if s.WorkdirCleanupAge != nil {
+		if *s.WorkdirCleanupAge < 0 {
+			log.Warnf("Ignoring invalid runner.workdir_cleanup_age: %s", s.WorkdirCleanupAge.String())
+		} else {
+			config.Runner.WorkdirCleanupAge = *s.WorkdirCleanupAge
+		}
+	}
+	if s.IdleCleanupInterval != nil {
+		if *s.IdleCleanupInterval < 0 {
+			log.Warnf("Ignoring invalid runner.idle_cleanup_interval: %s", s.IdleCleanupInterval.String())
+		} else {
+			config.Runner.IdleCleanupInterval = *s.IdleCleanupInterval
 		}
 	}
 	if len(s.Labels) != 0 {
@@ -521,7 +539,9 @@ func New(opts ...Option) (*Config, error) {
 			Capacity:       1,
 			Timeout:        3 * time.Hour,
 			FetchTimeout:   30 * time.Second,
-			ReportInterval: time.Second,
+			ReportInterval:     time.Second,
+			WorkdirCleanupAge:   24 * time.Hour,
+			IdleCleanupInterval: 10 * time.Minute,
 			ReportRetry: Retry{
 				MaxRetries:   10,
 				InitialDelay: 100 * time.Millisecond,
