@@ -1,6 +1,12 @@
 name: Sync Forgejo Runner upstream
 
 on:
+  # Smoke-test the sync immediately when this workflow is installed/updated.
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/upstream-sync.yml'
   schedule:
     # Weekly, Mondays at 06:27 UTC (avoid GitHub's top-of-hour peak).
     - cron: '27 6 * * 1'
