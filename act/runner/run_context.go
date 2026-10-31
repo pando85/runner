@@ -28,6 +28,7 @@ import (
 	"code.forgejo.org/forgejo/runner/v13/act/exprparser"
 	"code.forgejo.org/forgejo/runner/v13/act/model"
 	"code.forgejo.org/forgejo/runner/v13/act/plugin"
+	"code.forgejo.org/forgejo/runner/v13/internal/pkg/workspacegc"
 	"github.com/docker/go-connections/nat"
 	"github.com/moby/moby/client"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -330,6 +331,15 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 		cacheDir := rc.ActionCacheDir()
 		randName := common.MustRandName(8)
 		miscpath := filepath.Join(cacheDir, randName)
+		if err := os.MkdirAll(cacheDir, 0o700); err != nil {
+			return fmt.Errorf("create host scratch parent: %w", err)
+		}
+		if err := os.Mkdir(miscpath, 0o700); err != nil {
+			return fmt.Errorf("create host scratch directory: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(miscpath, workspacegc.Marker), nil, 0o600); err != nil {
+			return fmt.Errorf("mark host scratch directory: %w", err)
+		}
 		actPath := filepath.Join(miscpath, "act")
 		if err := os.MkdirAll(actPath, 0o777); err != nil {
 			return err
