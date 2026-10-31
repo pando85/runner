@@ -1,0 +1,90 @@
+name: Sync Forgejo Runner upstream
+
+on:
+  # Smoke-test the sync immediately when this workflow is installed/updated.
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/upstream-sync.yml'
+  schedule:
+    # Weekly, Mondays at 06:27 UTC (avoid GitHub's top-of-hour peak).
+    - cron: '27 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: forgejo-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Prepare upstream merge PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork with full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Merge official Forgejo history into a review branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git remote add forgejo https://code.forgejo.org/forgejo/runner.git
+          git fetch --no-tags forgejo +refs/heads/main:refs/remotes/forgejo/main
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+
+          if git merge-base --is-ancestor forgejo/main origin/main; then
+            echo 'Fork already includes the current Forgejo main history.'
+            exit 0
+          fi
+
+          sync_branch='sync/forgejo-upstream'
+          existing_pr="$(gh pr list --head "$sync_branch" --base main --state open --json number --jq '.[0].number // empty')"
+
+          # Avoid rebuilding and force-pushing an unchanged pending sync PR.
+          if git ls-remote --exit-code --heads origin "$sync_branch" >/dev/null; then
+            git fetch --no-tags origin "+refs/heads/$sync_branch:refs/remotes/origin/$sync_branch"
+            if [ -n "$existing_pr" ] && \
+               git merge-base --is-ancestor forgejo/main "origin/$sync_branch" && \
+               git merge-base --is-ancestor origin/main "origin/$sync_branch"; then
+              echo "Existing PR #$existing_pr already contains the latest upstream changes."
+              exit 0
+            fi
+          fi
+
+          git checkout -B "$sync_branch" origin/main
+          if ! git merge --no-ff --no-edit forgejo/main; then
+            echo '::error::Forgejo upstream merge has conflicts; resolve them manually.'
+            git diff --name-only --diff-filter=U || true
+            git merge --abort || true
+            exit 1
+          fi
+
+          # Only this bot-managed sync branch may be rewritten.
+          git push --force-with-lease origin "HEAD:refs/heads/$sync_branch"
+
+          if [ -z "$existing_pr" ]; then
+            gh pr create \
+              --head "$sync_branch" \
+              --base main \
+              --title 'chore: sync Forgejo Runner upstream' \
+              --body 'Automated weekly merge from https://code.forgejo.org/forgejo/runner (main). Review upstream changes and CI before merging. **Use a merge commit, NOT squash or rebase**, to preserve the upstream Git ancestry for future syncs. Updates to the fork image must also be validated before rolling out the container image.'
+          else
+            echo "Updated pending upstream sync PR #$existing_pr."
+          fi
+
+          # GITHUB_TOKEN-created PRs may require workflow approval. Explicit
+          # workflow_dispatch also runs independent tests/builds for this branch.
+          gh workflow run runner-image.yml --ref "$sync_branch"
