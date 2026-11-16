@@ -622,7 +622,9 @@ func TestPollerPollMultipleClients(t *testing.T) {
 
 			go poller.Poll()
 
-			time.Sleep(35 * time.Second)
+			// Sleep slightly longer than 35s to ensure the rate-limited poll at t=35s
+			// completes before shutdown begins (avoids a synctest ordering race at the boundary).
+			time.Sleep(35*time.Second + 1*time.Millisecond)
 			require.NoError(t, poller.Shutdown(t.Context()))
 
 			// Ensure second calls (or more) happened where assertions are.
