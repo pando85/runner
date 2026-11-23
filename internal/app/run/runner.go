@@ -192,7 +192,11 @@ func explainFailedGenerateWorkflow(task *runnerv1.Task, log func(message string,
 }
 
 func getWriteIsolationKey(ctx context.Context, eventName, ref string, event map[string]any) (string, error) {
-	if eventName == "pull_request" {
+	// A reusable (workflow_call) job triggered by a pull request keeps the
+	// pull request's authoritative ref in the task context, so it must be
+	// write-isolated like the pull_request event that triggered it. Jobs
+	// triggered by anything else keep the trusted namespace.
+	if eventName == "pull_request" || (eventName == "workflow_call" && strings.HasPrefix(ref, "refs/pull/")) {
 		// The "closed" action of a pull request event runs in the context of the base repository
 		// and was merged by a user with write access to the base repository. It is authorized to
 		// write the repository cache.
