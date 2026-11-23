@@ -20,6 +20,7 @@ import (
 	"code.forgejo.org/forgejo/runner/v13/act/runner"
 	"github.com/joho/godotenv"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -375,7 +376,29 @@ func runExec(ctx context.Context, execArgs *executeArgs) error {
 	log.Infof("cache handler listens on: %v", handler.ExternalURL())
 	execArgs.cacheHandler = handler
 
-	if execArgs.containerDaemonSocket != "/var/run/docker.sock" {
+	// Check for default value of argument --container-daemon-socket
+	// If the default container deamon socket '/var/run/docker.sock' is not available, fall back on '-'
+	if execArgs.containerDaemonSocket == "/var/run/docker.sock" {
+		defaultSocketURL := "unix://" + execArgs.containerDaemonSocket
+
+		c, err := client.New(client.WithHost(defaultSocketURL))
+		if err != nil {
+			return fmt.Errorf(
+				"Could not create client for the default container daemon socket '%s': %w",
+				defaultSocketURL, err,
+			)
+		}
+		defer c.Close()
+
+		_, err = c.Ping(ctx, client.PingOptions{})
+		if err != nil {
+			log.WithError(err).Infof(
+				"Ping to the default container daemon socket '%s' did not succeed, falling back on '-'",
+				defaultSocketURL,
+			)
+			execArgs.containerDaemonSocket = "-"
+		}
+	} else {
 		log.Warnf("--container-daemon-socket %s: please use the DOCKER_HOST environment variable as documented at https://forgejo.org/docs/next/admin/actions/runner-installation/#setting-up-the-container-environment instead. See https://code.forgejo.org/forgejo/runner/issues/577 for more information.", execArgs.containerDaemonSocket)
 	}
 

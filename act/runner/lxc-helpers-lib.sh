@@ -330,7 +330,11 @@ function lxc_container_start() {
 
     local logs
     if $LXC_VERBOSE; then
-        logs="--logfile=/dev/tty"
+        if { : >/dev/tty; } 2>/dev/null; then
+            logs="--logfile=/dev/tty"
+        else
+            logs="--logfile=/dev/stderr"
+        fi
     fi
 
     $LXC_SUDO lxc-start $logs $name
@@ -393,7 +397,12 @@ function lxc_build_template_release() {
     fi
 
     local draft=$(lxc_transaction_draft_name)
-    $LXC_SUDO lxc-create --name $draft --template debian -- --release=$LXC_CONTAINER_RELEASE
+    local options=""
+    if test "$LXC_CONTAINER_RELEASE" = bullseye; then
+        # bullseye is EOL: its security updates moved to archive.debian.org
+        options="--security-mirror=http://archive.debian.org/debian-security/"
+    fi
+    $LXC_SUDO lxc-create --name $draft --template debian -- --release=$LXC_CONTAINER_RELEASE $options
     echo 'lxc.apparmor.profile = unconfined' | $LXC_SUDO tee -a $(lxc_config $draft)
     lxc_container_install_lxc_helpers $draft
     lxc_container_start $draft
@@ -451,6 +460,14 @@ function lxc_apt_install_inside() {
     apt-get install -y -qq "$@"
 }
 
+function lxc_accept_ra_inside() {
+    # forwarding gets enabled by lxc-net and docker; with accept_ra=1 the
+    # kernel then ignores router advertisements and the IPv6 default route
+    # learned from the parent bridge is lost
+    echo 'net.ipv6.conf.eth0.accept_ra = 2' >/etc/sysctl.d/60-lxc-helpers-accept-ra.conf
+    sysctl -qw net.ipv6.conf.eth0.accept_ra=2 || true
+}
+
 function lxc_install_lxc() {
     local name="$1"
     local prefix="$2"
@@ -462,6 +479,8 @@ function lxc_install_lxc() {
 function lxc_install_lxc_inside() {
     local prefix="$1"
     local prefixv6="${2:-$LXC_IPV6_PREFIX_DEFAULT}"
+
+    lxc_accept_ra_inside
 
     local packages="make git libvirt0 libpam-cgfs bridge-utils uidmap dnsmasq-base dnsmasq dnsmasq-utils qemu-user-static lxc-templates debootstrap"
     if test "$(lxc_release)" != bullseye; then
@@ -498,11 +517,15 @@ function lxc_install_docker() {
 }
 
 function lxc_install_docker_inside() {
+    lxc_accept_ra_inside
+
     mkdir /etc/docker
     cat >/etc/docker/daemon.json <<EOF
 {
   "insecure-registries": [ "10.0.0.0/8", "192.168.0.0/16" ],
   "ipv6": true,
+  "experimental": true,
+  "ip6tables": true,
   "fixed-cidr-v6": "$LXC_IPV6_DOCKER_PREFIX_DEFAULT:1::/64",
   "default-address-pools": [
     {"base": "$LXC_DOCKER_PREFIX_DEFAULT.0.0/16", "size": 24},

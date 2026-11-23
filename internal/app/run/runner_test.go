@@ -261,6 +261,44 @@ func TestRunner_getWriteIsolationKey(t *testing.T) {
 		require.Empty(t, key)
 		assert.ErrorContains(t, err, "not a bool but string")
 	})
+
+	t.Run("workflow_call from pull request key is ref", func(t *testing.T) {
+		expectedKey := "refs/pull/1/head"
+		actualKey, err := getWriteIsolationKey(t.Context(), "workflow_call", expectedKey, map[string]any{
+			"action": "synchronized",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, expectedKey, actualKey)
+	})
+
+	t.Run("workflow_call from pull request closed and not merged key is ref", func(t *testing.T) {
+		expectedKey := "refs/pull/1/head"
+		actualKey, err := getWriteIsolationKey(t.Context(), "workflow_call", expectedKey, map[string]any{
+			"action": "closed",
+			"pull_request": map[string]any{
+				"merged": false,
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, expectedKey, actualKey)
+	})
+
+	t.Run("workflow_call from pull request closed and merged key is empty", func(t *testing.T) {
+		key, err := getWriteIsolationKey(t.Context(), "workflow_call", "refs/pull/1/head", map[string]any{
+			"action": "closed",
+			"pull_request": map[string]any{
+				"merged": true,
+			},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, key)
+	})
+
+	t.Run("workflow_call from push key is empty", func(t *testing.T) {
+		key, err := getWriteIsolationKey(t.Context(), "workflow_call", "refs/heads/main", nil)
+		require.NoError(t, err)
+		assert.Empty(t, key)
+	})
 }
 
 func TestRunnerCacheConfiguration(t *testing.T) {
